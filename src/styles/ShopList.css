@@ -1,0 +1,40 @@
+/* 共通レイアウト */
+.shoplist-genre-header {
+    position: relative;
+    padding-bottom: 4px;
+    /* CSS変数で色指定（デフォルトは黒） */
+    color: var(--genre-color-text, #000000);
+}
+
+.shoplist-genre-header span {
+    padding: 0 10px;
+}
+  
+/* 下線の共通形状 */
+.shoplist-genre-header::after {
+    content: "";
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    height: 3px;
+    width: 100%;
+    border-radius: 3px;
+    /* CSS変数で色指定 */
+    background: var(--genre-color-border, #000000);
+}
+
+/* 行間0（共通） */
+.shoplist-row {
+    margin: 0;
+    padding: 0;
+}
+
+/* 最初の1行目だけヘッダーに近づける（共通） */
+.shoplist-row-first {
+    margin-top: -4px;
+}
+
+/* 偶数行用のストライプスタイル（CSS変数で色指定） */
+.shoplist-row-striped {
+    background: var(--genre-color-row, transparent);
+}
