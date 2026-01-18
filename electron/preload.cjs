@@ -132,6 +132,19 @@ contextBridge.exposeInMainWorld('electronAPI', {
       ipcRenderer.removeListener('genre-mappings-updated', listener);
     };
   },
+  getGenreGlobalSettings() {
+    return ipcRenderer.invoke('get-genre-global-settings');
+  },
+  saveGenreGlobalSettings(settings) {
+    return ipcRenderer.invoke('save-genre-global-settings', settings);
+  },
+  onGenreGlobalSettingsUpdated(callback) {
+    const listener = (_event, updated) => callback(updated);
+    ipcRenderer.on('genre-global-settings-updated', listener);
+    return () => {
+      ipcRenderer.removeListener('genre-global-settings-updated', listener);
+    };
+  },
   getShopSettings() {
     return ipcRenderer.invoke('get-shop-settings');
   },

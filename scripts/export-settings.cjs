@@ -3,12 +3,12 @@ const path = require('path');
 const os = require('os');
 
 // アプリケーション名 (package.jsonのproductNameと一致させる)
-const APP_NAME = 'Gido';
+const APP_NAME = 'Gido-S';
 
 // 設定ファイルのパスを特定
-// Windows: %APPDATA%/Gido/settings.json
-// macOS: ~/Library/Application Support/Gido/settings.json
-// Linux: ~/.config/Gido/settings.json
+// Windows: %APPDATA%/Gido-S/settings.json
+// macOS: ~/Library/Application Support/Gido-S/settings.json
+// Linux: ~/.config/Gido-S/settings.json
 let userDataPath;
 if (process.platform === 'win32') {
   userDataPath = path.join(process.env.APPDATA, APP_NAME);

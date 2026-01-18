@@ -7,6 +7,11 @@ export interface GenreDisplayConfig {
 
 export type GenreMappings = Record<string, GenreDisplayConfig>;
 
+export interface GenreGlobalSettings {
+  maxItems: number;
+  ignoredKeywords: string[];
+}
+
 export const DEFAULT_GENRE_MAPPINGS: GenreMappings = {
   "ファッション": {
     labelEn: "Fashion",
@@ -46,4 +51,20 @@ export const DEFAULT_GENRE_CONFIG: GenreDisplayConfig = {
   headerTextColor: "#ffffff",
   headerBorderColor: "#ffffff",
   rowBackgroundColor: "rgba(255, 255, 255, 0.1)",
+};
+
+export const DEFAULT_GENRE_GLOBAL_SETTINGS: GenreGlobalSettings = {
+  maxItems: 3,
+  ignoredKeywords: [
+    "WAONPOINT加盟店",
+    "AEONPayが使えるお店",
+    "Aeonpayが使えるお店",
+    "AEONPayの使えるお店",
+    "グルメ",
+    "フード",
+    "フードコート",
+    "レストラン",
+    "SUZAKA蔵",
+    "SUZUKA蔵",
+  ],
 };

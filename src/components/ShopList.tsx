@@ -9,7 +9,7 @@ import {
 } from "../config";
 import "../styles/ShopList.css";
 import { logError, logDebug } from "../logs/logging";
-import { DEFAULT_GENRE_MAPPINGS, type GenreMappings, DEFAULT_GENRE_CONFIG } from "../types/genreSettings";
+import { DEFAULT_GENRE_MAPPINGS, type GenreMappings, DEFAULT_GENRE_CONFIG, type GenreGlobalSettings, DEFAULT_GENRE_GLOBAL_SETTINGS } from "../types/genreSettings";
 import type { ShopSettings } from "../types/shopSettings";
 
 type ColumnPadding = {
@@ -27,6 +27,7 @@ interface ShopListProps {
   perColumnRows?: number[]; // Column-by-column row overrides
   perColumnPadding?: ColumnPadding[]; // Column-by-column padding
   genreMappings?: GenreMappings;
+  genreGlobalSettings?: GenreGlobalSettings;
   shopSettings?: ShopSettings;
 }
 
@@ -78,6 +79,127 @@ function buildSectionsForColumn(lines: Line[]): ColumnSection[] {
   return sections;
 }
 
+// Helper to process genre memo: split, filter unwanted keywords, limit items, and join
+function processGenreMemo(
+  rawMemo: string | undefined,
+  maxItems: number | undefined,
+  ignoredKeywords: string[]
+): string | undefined {
+  if (!rawMemo) return undefined;
+
+  // 1. Split into parts
+  const parts = rawMemo.split(/[、,，・/／\s　|｜]+/);
+
+  const filteredParts = parts.filter((p) => {
+    const trimmed = p.trim();
+    if (trimmed.length === 0) return false;
+
+    // Filter out floor notations like "1F", "2階", "B1F", etc.
+    if (/^\d+F$/.test(trimmed) || /^\d+階$/.test(trimmed) || /^B\d+F$/.test(trimmed)) {
+      return false;
+    }
+
+    // Check if the part matches any ignored keyword (case insensitive)
+    return !ignoredKeywords.some(keyword => trimmed.toLowerCase() === keyword.toLowerCase());
+  });
+
+  if (filteredParts.length === 0) return undefined;
+
+  // Remove duplicates
+  const uniqueParts = Array.from(new Set(filteredParts));
+
+  // 3. Limit items
+  // If maxItems is provided (>= 0), use it. Otherwise use fallback (3).
+  // Caller passes effective limit, but we ensure a safe fallback just in case.
+  const limit = (maxItems !== undefined && maxItems >= 0) ? maxItems : 3;
+  const sliced = uniqueParts.slice(0, limit);
+
+  return sliced.join("・");
+}
+
+// Helper component to condense text width (scaleX) if it overflows
+const CondensableText: React.FC<{ text: string; align?: "left" | "right" }> = ({ text, align = "left" }) => {
+  const containerRef = React.useRef<HTMLSpanElement>(null);
+  const textRef = React.useRef<HTMLSpanElement>(null);
+  const [scale, setScale] = React.useState(1);
+
+  React.useLayoutEffect(() => {
+    const container = containerRef.current;
+    const textEl = textRef.current;
+    if (!container || !textEl) return;
+
+    // Reset scale to measure natural width
+    // We need to reset to 1 before measuring to handle updates correctly
+    // But setting state here would cause loop. Direct style manipulation is safer for measurement.
+    textEl.style.transform = "scaleX(1)";
+    
+    const containerWidth = container.clientWidth;
+    const textWidth = textEl.scrollWidth;
+
+    if (textWidth > containerWidth && containerWidth > 0) {
+      const newScale = containerWidth / textWidth;
+      // Limit minimum scale to avoid unreadable text (e.g. 0.5)
+      // Request didn't specify min, but practically 0.3-0.5 is limit.
+      setScale(Math.max(newScale, 0.4)); 
+    } else {
+      setScale(1);
+    }
+  }, [text]); // Re-run when text changes. Window resize handling is tricky in pure CSS grid/flex env without ResizeObserver.
+
+  // Use ResizeObserver for responsiveness
+  React.useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    const observer = new ResizeObserver(() => {
+        // Trigger measurement logic again
+        const textEl = textRef.current;
+        if (!textEl) return;
+        
+        textEl.style.transform = "scaleX(1)";
+        const containerWidth = container.clientWidth;
+        const textWidth = textEl.scrollWidth;
+
+        if (textWidth > containerWidth && containerWidth > 0) {
+            const newScale = containerWidth / textWidth;
+            setScale(Math.max(newScale, 0.4));
+        } else {
+            setScale(1);
+        }
+    });
+
+    observer.observe(container);
+    return () => observer.disconnect();
+  }, [text]);
+
+  return (
+    <span
+      ref={containerRef}
+      style={{
+        display: "inline-block",
+        width: "100%", // Take available space
+        maxWidth: "100%",
+        whiteSpace: "nowrap",
+        overflow: "hidden", // Hide overflow until scaled
+        textAlign: align,
+        verticalAlign: "bottom", // Align baseline
+      }}
+    >
+      <span
+        ref={textRef}
+        style={{
+          display: "inline-block",
+          transform: `scaleX(${scale})`,
+          transformOrigin: align === "right" ? "right center" : "left center",
+          whiteSpace: "nowrap",
+        }}
+      >
+        {text}
+      </span>
+    </span>
+  );
+};
+
 // Compare shop numbers numerically (ascending)
 function compareShopNumberAsc(a: Shop, b: Shop): number {
   return (a.number || "").localeCompare(b.number || "", "ja", {
@@ -95,6 +217,7 @@ const ShopList: React.FC<ShopListProps> = ({
   perColumnRows,
   perColumnPadding,
   genreMappings = DEFAULT_GENRE_MAPPINGS,
+  genreGlobalSettings = DEFAULT_GENRE_GLOBAL_SETTINGS,
   shopSettings,
 }) => {
   const normalizedFloor = normalizeFloor(floor);
@@ -343,16 +466,14 @@ const ShopList: React.FC<ShopListProps> = ({
                     {section.shops.map((s, idx) => {
                       const shopConfig =
                         s.shopId && shopSettings && typeof shopSettings === 'object' ? shopSettings[s.shopId] : undefined;
-                      const maxItems = shopConfig?.genreMemoMaxItems;
                       
-                      let displayMemo = s.genreMemo;
-                      if (displayMemo && maxItems !== undefined && maxItems >= 0) {
-                        const parts = displayMemo.split(/[、,，・/／\s　|｜]+/);
-                        // Filter out empty strings first, then slice
-                        const nonEmptyParts = parts.filter((p) => p.trim().length > 0);
-                        const sliced = nonEmptyParts.slice(0, maxItems);
-                        displayMemo = sliced.join("・");
+                      // Resolve maxItems
+                      let maxItems = shopConfig?.genreMemoMaxItems;
+                      if (maxItems === undefined || maxItems < 0) {
+                          maxItems = genreGlobalSettings.maxItems;
                       }
+                      
+                      const displayMemo = processGenreMemo(s.genreMemo, maxItems, genreGlobalSettings.ignoredKeywords);
 
                       const rowClassNames = [
                         "shoplist-row",
@@ -361,6 +482,8 @@ const ShopList: React.FC<ShopListProps> = ({
                       ]
                         .filter(Boolean)
                         .join(" ");
+                      
+                      const showShopNumber = s.number && /\d/.test(s.number);
 
                       return (
                         <div
@@ -378,6 +501,9 @@ const ShopList: React.FC<ShopListProps> = ({
                               marginLeft: "0.5em",
                               display: "inline-flex",
                               alignItems: "center",
+                              flex: "0 1 auto",
+                              minWidth: 0,
+                              overflow: "hidden",
                             }}
                           >
                             <span
@@ -385,9 +511,11 @@ const ShopList: React.FC<ShopListProps> = ({
                                 display: "inline-block",
                                 width: "4em",
                                 textAlign: "left",
+                                flexShrink: 0,
+                                visibility: showShopNumber ? "visible" : "hidden",
                               }}
                             >
-                              {s.number}
+                              <CondensableText text={s.number} />
                             </span>
 
                             {displayMemo && (
@@ -397,9 +525,13 @@ const ShopList: React.FC<ShopListProps> = ({
                                   fontFamily: "Rounded Mplus 1c, sans-serif",
                                   fontWeight: 400,
                                   fontSize: "0.7em",
+                                  flex: "0 1 auto",
+                                  minWidth: 0,
+                                  display: "inline-block",
+                                  maxWidth: "24em",
                                 }}
                               >
-                                {`[${displayMemo}]`}
+                                <CondensableText text={`[${displayMemo}]`} />
                               </span>
                             )}
                           </span>
@@ -408,9 +540,13 @@ const ShopList: React.FC<ShopListProps> = ({
                             style={{
                               marginLeft: "12px",
                               marginRight: "0.5em",
+                              flex: "1 1 auto",
+                              minWidth: 0,
+                              textAlign: "right",
+                              overflow: "hidden",
                             }}
                           >
-                            {s.name}
+                             <CondensableText text={s.name} align="right" />
                           </span>
                         </div>
                       );
@@ -452,37 +588,36 @@ const ShopList: React.FC<ShopListProps> = ({
           // const config = genreMappings[s.genre] || DEFAULT_GENRE_CONFIG;
           const shopConfig =
             s.shopId && shopSettings && typeof shopSettings === 'object' ? shopSettings[s.shopId] : undefined;
-          const maxItems = shopConfig?.genreMemoMaxItems;
-          
-          let displayMemo = s.genreMemo;
-          if (displayMemo && maxItems !== undefined && maxItems >= 0) {
-            const parts = displayMemo.split(/[、,，・/／\s　|｜]+/);
-            // Filter out empty strings first, then slice
-            const nonEmptyParts = parts.filter((p) => p.trim().length > 0);
-            const sliced = nonEmptyParts.slice(0, maxItems);
-            displayMemo = sliced.join("・");
+
+          let maxItems = shopConfig?.genreMemoMaxItems;
+          if (maxItems === undefined || maxItems < 0) {
+              maxItems = genreGlobalSettings.maxItems;
           }
+          
+          const displayMemo = processGenreMemo(s.genreMemo, maxItems, genreGlobalSettings.ignoredKeywords);
+          const showShopNumber = s.number && /\d/.test(s.number);
 
           return (
             <div
               key={`${s.number}-${s.name}`}
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              whiteSpace: "nowrap",
-            }}
-          >
-            <span>
-              <span
-                style={{
-                  display: "inline-block",
-                  width: "4em",
-                  textAlign: "left",
-                }}
-              >
-                {s.number}
-              </span>
-              {displayMemo && (
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                whiteSpace: "nowrap",
+              }}
+            >
+              <span>
+                <span
+                  style={{
+                    display: "inline-block",
+                    width: "4em",
+                    textAlign: "left",
+                    visibility: showShopNumber ? "visible" : "hidden",
+                  }}
+                >
+                  {s.number}
+                </span>
+                {displayMemo && (
                 <span
                   style={{
                     marginLeft: "0.5em",

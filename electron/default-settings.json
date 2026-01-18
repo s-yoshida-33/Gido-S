@@ -1,7 +1,7 @@
 {
   "locationIcons": {
     "speechBubble": {
-      "enabled": true,
+      "enabled": false,
       "xPercent": 14.6,
       "yPercent": 52,
       "size": 90,
@@ -27,7 +27,7 @@
       }
     },
     "location": {
-      "enabled": true,
+      "enabled": false,
       "xPercent": 15.2,
       "yPercent": 57.2,
       "size": 50,
@@ -49,10 +49,6 @@
         "rippleColor": "#E63B93"
       }
     }
-  },
-  "portRanges": {
-    "bridge": { "min": 8090, "max": 8099 },
-    "cms": { "min": 8080, "max": 8089 }
   },
   "floorLayout": {
     "1F": {

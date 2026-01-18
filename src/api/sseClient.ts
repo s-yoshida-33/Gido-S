@@ -1,4 +1,5 @@
 import { getApiBaseUrl } from "../config";
+import { logDataSync, logDataSyncError } from "../logs/logging";
 
 export type SseConnectionStatus = 'disconnected' | 'connecting' | 'connected' | 'error';
 
@@ -58,10 +59,12 @@ class SseClient {
       this.eventSource = new EventSource(url);
 
       this.eventSource.onopen = () => {
+        logDataSync("BridgeGround SSE Connected", { endpoint: url });
         this.setStatus('connected');
       };
 
       this.eventSource.onerror = (_error) => {
+        logDataSyncError("BridgeGround SSE Disconnected", { error: "Connection failed or interrupted" });
         this.setStatus('error');
         this.eventSource?.close();
         this.eventSource = null;

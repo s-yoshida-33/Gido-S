@@ -1,11 +1,13 @@
 import React, { useState } from "react";
 import { Reorder, useDragControls } from "framer-motion";
-import type { GenreMappings, GenreDisplayConfig } from "../types/genreSettings";
-import { DEFAULT_GENRE_CONFIG } from "../types/genreSettings";
+import type { GenreMappings, GenreDisplayConfig, GenreGlobalSettings } from "../types/genreSettings";
+import { DEFAULT_GENRE_CONFIG, DEFAULT_GENRE_GLOBAL_SETTINGS } from "../types/genreSettings";
 
 interface GenreSettingsTabProps {
   genreMappings: GenreMappings;
   onChangeGenreMappings: (mappings: GenreMappings) => void;
+  genreGlobalSettings?: GenreGlobalSettings;
+  onChangeGenreGlobalSettings?: (settings: GenreGlobalSettings) => void;
 }
 
 // Helper to convert unknown color string to hex for input[type=color]
@@ -205,9 +207,39 @@ const DraggableItem: React.FC<{
 export const GenreSettingsTab: React.FC<GenreSettingsTabProps> = ({
   genreMappings,
   onChangeGenreMappings,
+  genreGlobalSettings,
+  onChangeGenreGlobalSettings,
 }) => {
   const [newGenre, setNewGenre] = useState("");
+  const [newKeyword, setNewKeyword] = useState("");
   const [editingKey, setEditingKey] = useState<string | null>(null);
+
+  const currentGlobalSettings = genreGlobalSettings || DEFAULT_GENRE_GLOBAL_SETTINGS;
+
+  const handleUpdateGlobal = (partial: Partial<GenreGlobalSettings>) => {
+      onChangeGenreGlobalSettings?.({ ...currentGlobalSettings, ...partial });
+  };
+
+  const handleAddKeyword = () => {
+    if (!newKeyword.trim()) return;
+    const val = newKeyword.trim();
+    // Check duplication (case insensitive)
+    if (currentGlobalSettings.ignoredKeywords.some(k => k.toLowerCase() === val.toLowerCase())) {
+        alert("既に登録されています");
+        return;
+    }
+    handleUpdateGlobal({
+        ignoredKeywords: [...currentGlobalSettings.ignoredKeywords, val]
+    });
+    setNewKeyword("");
+  };
+
+  const handleDeleteKeyword = (keyword: string) => {
+    if (!confirm(`除外キーワード「${keyword}」を削除しますか？`)) return;
+    handleUpdateGlobal({
+        ignoredKeywords: currentGlobalSettings.ignoredKeywords.filter(k => k !== keyword)
+    });
+  };
 
   // Maintain local order state for Reorder component
   // Initialize from genreMappings keys
@@ -292,6 +324,110 @@ export const GenreSettingsTab: React.FC<GenreSettingsTabProps> = ({
   return (
     <div style={{ color: "#ffffff", display: "flex", flexDirection: "column", gap: 24 }}>
       
+      {/* Global Settings Section */}
+      <div style={{ padding: 16, backgroundColor: "rgba(255,255,255,0.05)", borderRadius: 6 }}>
+        <h4 style={{ margin: "0 0 16px 0", fontSize: 16 }}>共通設定</h4>
+        
+        {/* Max Items */}
+        <div style={{ marginBottom: 20 }}>
+            <label style={{ display: "block", fontSize: 13, marginBottom: 8 }}>
+                ジャンルメモ最大表示件数 (デフォルト: 3)
+            </label>
+            <input 
+                type="number" 
+                min="1"
+                value={currentGlobalSettings.maxItems} 
+                onChange={e => handleUpdateGlobal({ maxItems: parseInt(e.target.value) || 3 })}
+                style={{ 
+                    width: "100%", 
+                    padding: "8px", 
+                    borderRadius: 4, 
+                    border: "1px solid rgba(255,255,255,0.2)",
+                    backgroundColor: "rgba(255,255,255,0.1)",
+                    color: "#fff"
+                }}
+            />
+        </div>
+
+        {/* Ignored Keywords */}
+        <div>
+            <label style={{ display: "block", fontSize: 13, marginBottom: 8 }}>
+                除外キーワード
+            </label>
+            
+            {/* Keyword List */}
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 12 }}>
+                {currentGlobalSettings.ignoredKeywords.map((kw, idx) => (
+                    <div key={`${kw}-${idx}`} style={{
+                        display: "flex",
+                        alignItems: "center",
+                        backgroundColor: "rgba(255,255,255,0.1)",
+                        padding: "4px 8px",
+                        borderRadius: 4,
+                        fontSize: 12
+                    }}>
+                        <span>{kw}</span>
+                        <button
+                            onClick={() => handleDeleteKeyword(kw)}
+                            style={{
+                                background: "none",
+                                border: "none",
+                                color: "#ff4444",
+                                marginLeft: 6,
+                                cursor: "pointer",
+                                padding: 0,
+                                fontSize: 14,
+                                lineHeight: 1
+                            }}
+                        >
+                            ×
+                        </button>
+                    </div>
+                ))}
+            </div>
+
+            {/* Add Keyword Input */}
+            <div style={{ display: "flex", gap: 8 }}>
+                <input 
+                    type="text" 
+                    value={newKeyword} 
+                    onChange={e => setNewKeyword(e.target.value)}
+                    placeholder="新しいキーワード"
+                    style={{ 
+                        flex: 1, 
+                        padding: "8px", 
+                        borderRadius: 4, 
+                        border: "1px solid rgba(255,255,255,0.2)",
+                        backgroundColor: "rgba(255,255,255,0.1)",
+                        color: "#fff"
+                    }}
+                    onKeyDown={e => {
+                        if (e.key === 'Enter') handleAddKeyword();
+                    }}
+                />
+                <button
+                    onClick={handleAddKeyword}
+                    disabled={!newKeyword}
+                    style={{
+                        padding: "8px 16px",
+                        backgroundColor: "#007aff",
+                        border: "none",
+                        borderRadius: 4,
+                        color: "#fff",
+                        cursor: !newKeyword ? "not-allowed" : "pointer",
+                        opacity: !newKeyword ? 0.5 : 1
+                    }}
+                >
+                    追加
+                </button>
+            </div>
+        </div>
+      </div>
+
+      <div style={{ borderBottom: "1px solid rgba(255, 255, 255, 0.1)", paddingBottom: 8 }}>
+          <h4 style={{ margin: 0, fontSize: 16 }}>ジャンル別設定</h4>
+      </div>
+
       <Reorder.Group axis="y" values={order} onReorder={handleReorder} style={{ padding: 0, margin: 0 }}>
         {order.length === 0 && (
           <div style={{ padding: 16, textAlign: "center", opacity: 0.5, backgroundColor: "rgba(255,255,255,0.05)", borderRadius: 6 }}>

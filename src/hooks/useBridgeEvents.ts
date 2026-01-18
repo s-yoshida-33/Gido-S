@@ -2,7 +2,7 @@ import { useEffect } from "react";
 import { sseClient } from "../api/sseClient";
 import { extractShopsFromResponse, normalizeBridgeShops } from "../api/bridgeClient";
 import type { Shop } from "../types/shop";
-import { logInfo, logError, logDebug } from "../logs/logging";
+import { logInfo, logError, logDebug, logDataSync, logDataSyncError } from "../logs/logging";
 
 export function useBridgeEvents(onUpdate: (shops?: Shop[]) => void) {
   useEffect(() => {
@@ -12,6 +12,11 @@ export function useBridgeEvents(onUpdate: (shops?: Shop[]) => void) {
     const unsubscribeShops = sseClient.on('shops', (data) => {
         try {
             const parsed = typeof data === 'string' ? JSON.parse(data) : data;
+            
+            logDataSync("Shop data received via SSE", {
+                hasContent: !!parsed
+            });
+
             logDebug("BridgeEvents", "Shops event received", { 
                 hasData: !!parsed 
             });
@@ -20,8 +25,14 @@ export function useBridgeEvents(onUpdate: (shops?: Shop[]) => void) {
             const rawList = extractShopsFromResponse(parsed);
             const shops = normalizeBridgeShops(rawList);
             
+            logDataSync("Shop data synced with BridgeGround", {
+                count: shops.length,
+                status: 200
+            });
+
             onUpdate(shops);
         } catch (err) {
+            logDataSyncError("Failed to process shop data", { error: String(err) });
             logError("BridgeEvents", "Error parsing shops event", { error: err });
             // Fallback to refetch if parsing fails
             onUpdate();

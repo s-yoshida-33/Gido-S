@@ -2,7 +2,7 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
 import type { CurrentAsset } from '../types/wsp';
 import { getCmsBaseUrl, fetchCurrentAsset } from '../repositories/wspRepository';
-import { logInfo, logWarn, logError, logDebug } from '../logs/logging';
+import { logInfo, logWarn, logError, logDebug, logCmsDelivery } from '../logs/logging';
 
 interface UseCurrentAssetResult {
   asset: CurrentAsset | null;
@@ -165,6 +165,15 @@ export function useCurrentAsset(
           const data = JSON.parse(e.data);
           // data.current_timeline contains the new timeline item
           const newAsset = mapTimelineToAsset(data.current_timeline);
+
+          if (newAsset) {
+            logCmsDelivery("Content switched via CMS", {
+               assetId: newAsset.id,
+               type: newAsset.type,
+               src: newAsset.src
+            });
+          }
+
           handleAssetUpdate(newAsset);
         } catch (err) {
           logError('video', 'Failed to parse switch event', { error: err });

@@ -121,7 +121,7 @@ export const LocationIconsOverlay: React.FC<Props> = ({ settings }) => {
   const speechBubbleWrapperStyle = {
     ...buildWrapperStyle(speechBubble),
     ...buildShadowStyle(speechBubble.shadow),
-    zIndex: 5,
+    zIndex: 7,
   };
 
   const locationWrapperStyle = {

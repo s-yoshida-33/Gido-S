@@ -8,7 +8,6 @@ import floorMap1F from "../assets/floor-1F-map.svg";
 import floorMap2F from "../assets/floor-2F-map.svg";
 import floorMap3F from "../assets/floor-3F-map.svg";
 import floorMap4F from "../assets/floor-4F-map.svg";
-import openTimeImage from "../assets/open-time.svg";
 
 import { APP_CONFIG, POLLING_INTERVALS } from "../config";
 import { fetchShops } from "../repositories/shopRepository";
@@ -20,13 +19,18 @@ import type { LocationIconSettings } from "../types/locationIcon";
 import { LocationIconsOverlay } from "../components/LocationIconsOverlay";
 import type { ImageSettings } from "../types/imageSettings";
 import type { FloorId } from "../types/floorLayout";
-import { DEFAULT_GENRE_MAPPINGS, type GenreMappings } from "../types/genreSettings";
+import { DEFAULT_GENRE_MAPPINGS, DEFAULT_GENRE_GLOBAL_SETTINGS, type GenreMappings, type GenreGlobalSettings } from "../types/genreSettings";
 import type { ShopSettings } from "../types/shopSettings";
 
-import { logInfo, logError } from "../logs/logging";
+import { logInfo, logError, logAssetCheck } from "../logs/logging";
 
-const LIST_HEIGHT_VH = APP_CONFIG.listHeightVh;
-const TOP_HEIGHT_VH = 100 - LIST_HEIGHT_VH;
+const VIDEO_HEIGHT_VH = (720 / 2160) * 100; // 33.333...%
+const LIST_HEIGHT_VH = (920 / 2160) * 100; // 42.592...%
+const MAP_HEIGHT_VH = (1235 / 2160) * 100; // 57.175...%
+
+// Video width ratio relative to total width (3840px)
+const VIDEO_WIDTH_VW = (1280 / 3840) * 100; // 33.333...%
+const LIST_WIDTH_VW = 100 - VIDEO_WIDTH_VW; // 66.666...%
 
 // Map floor id to image asset
 const FLOOR_MAPS: Record<string, string> = {
@@ -66,6 +70,7 @@ interface GidoAppProps {
   previewFloorLayout?: FloorLayout;
   imageSettings?: ImageSettings;
   genreMappings?: GenreMappings;
+  genreGlobalSettings?: GenreGlobalSettings;
   shopSettings?: ShopSettings;
 }
 
@@ -75,6 +80,7 @@ const GidoApp: React.FC<GidoAppProps> = ({
   previewFloorLayout,
   imageSettings,
   genreMappings = DEFAULT_GENRE_MAPPINGS,
+  genreGlobalSettings = DEFAULT_GENRE_GLOBAL_SETTINGS,
   shopSettings,
 }) => {
   const [shops, setShops] = useState<Shop[]>([]);
@@ -96,7 +102,6 @@ const GidoApp: React.FC<GidoAppProps> = ({
 
   // References for visibility check
   const floorMapRef = useRef<HTMLImageElement>(null);
-  const openTimeImageRef = useRef<HTMLImageElement>(null);
 
   // Periodic check for image visibility (every 5 minutes)
   useEffect(() => {
@@ -111,15 +116,6 @@ const GidoApp: React.FC<GidoAppProps> = ({
         const { naturalWidth, complete } = floorMapRef.current;
         if (!complete || naturalWidth === 0) {
           logError("monitor", "Floor map image not visible/loaded", { floor });
-          needsReload = true;
-        }
-      }
-
-      // Check Open Time Image
-      if (openTimeImageRef.current) {
-        const { naturalWidth, complete } = openTimeImageRef.current;
-        if (!complete || naturalWidth === 0) {
-          logError("monitor", "Open time image not visible/loaded");
           needsReload = true;
         }
       }
@@ -218,12 +214,6 @@ const GidoApp: React.FC<GidoAppProps> = ({
   const customFloorMap = floorId ? imageSettings?.floorMaps?.[floorId] : undefined;
   const floorMap = customFloorMap || FLOOR_MAPS[floor] || floorMap1F;
 
-  // Video area width (16:9 aspect ratio)
-  const videoWidthVh = TOP_HEIGHT_VH * (9 / 16);
-
-  // Shop list area width
-  const listWidthVh = 100 - videoWidthVh;
-
   // Shop data loading
   const loadShops = useCallback(async (providedShops?: Shop[]) => {
     try {
@@ -293,6 +283,26 @@ const GidoApp: React.FC<GidoAppProps> = ({
     loadShops();
   }, [loadShops, refreshKey]);
 
+  // Heartbeat - Every 1 hour
+  useEffect(() => {
+    // Initial heartbeat log
+    logInfo('system', 'System Heartbeat - App is running', {
+        tag: 'SYS_INIT',
+        shopCount: shops.length,
+        floor: floor
+    });
+
+    const intervalId = setInterval(() => {
+      logInfo('system', 'System Heartbeat - App is running', {
+        tag: 'SYS_INIT',
+        shopCount: shops.length,
+        floor: floor
+      });
+    }, 60 * 60 * 1000);
+
+    return () => clearInterval(intervalId);
+  }, [shops.length, floor]);
+
   // Listen for Bridge events (SSE) to update shops
   useBridgeEvents(loadShops);
 
@@ -309,70 +319,69 @@ const GidoApp: React.FC<GidoAppProps> = ({
         overflow: "hidden",
         fontFamily: "'Rounded Mplus 1c', sans-serif",
         fontWeight: 700,
+        display: "flex",
+        flexDirection: "column",
       }}
     >
-      {/* Top: map + video area */}
+      {/* Top: shop list + video area */}
       <div
         style={{
-          display: "flex",
-          height: `${TOP_HEIGHT_VH}vh`,
+          position: "relative",
+          height: `${VIDEO_HEIGHT_VH}vh`,
+          width: "100vw",
+          zIndex: 10,
         }}
       >
-        {/* Floor map */}
+        {/* Shop list (Left) */}
         <div
           style={{
-            flex: 2,
-            position: "relative",
-            display: "flex",
-            justifyContent: "center",
-            alignItems: "center",
+            position: "absolute",
+            top: 0,
+            left: 0,
+            width: `${LIST_WIDTH_VW}vw`,
+            height: `${LIST_HEIGHT_VH}vh`,
+            zIndex: 20,
           }}
         >
-          <img
-            ref={floorMapRef}
-            src={floorMap}
-            alt={`Floor map ${floor}`}
-            draggable={false}
-            style={{
-              maxWidth: "100%",
-              maxHeight: "100%",
-              objectFit: "contain",
-            }}
-            onLoad={() => {
-              logInfo("map", "Floor map image loaded", {
-                floor,
-                src: floorMap,
-              });
-            }}
-            onError={(event) => {
-              logError("map", "Failed to load floor map image", {
-                floor,
-                src: floorMap,
-              });
-              (event.target as HTMLImageElement).style.visibility = "hidden";
-            }}
-          />
-
-          {/* Location icons overlay */}
-          <LocationIconsOverlay settings={locationIconSettings} />
+          {error ? (
+            <div style={{ padding: "16px 32px", color: "red" }}>
+              Error: {error}
+            </div>
+          ) : (
+            <ShopList
+              shops={shops}
+              floor={floor}
+              columnCount={currentLayout.columns}
+              rowsPerColumn={currentLayout.rowsPerCol}
+              perColumnRows={currentLayout.perColumnRows}
+              perColumnPadding={currentLayout.perColumnPadding}
+              genreMappings={genreMappings}
+              genreGlobalSettings={genreGlobalSettings}
+              shopSettings={shopSettings}
+            />
+          )}
         </div>
 
-        {/* Video area */}
+        {/* Video area (Right) */}
         <div
           style={{
-            width: `${videoWidthVh}vh`,
+            position: "absolute",
+            top: 0,
+            right: 0,
+            width: `${VIDEO_WIDTH_VW}vw`,
+            height: "100%",
             background: "#000",
             display: "flex",
             justifyContent: "center",
             alignItems: "center",
-            flexShrink: 0,
+            zIndex: 10,
           }}
         >
           <div
             style={{
               width: "100%",
-              maxHeight: "100%",
-              aspectRatio: "9 / 16",
+              height: "100%", // Fit container
+              aspectRatio: "16 / 9",
               overflow: "hidden",
               background: "#000",
             }}
@@ -399,76 +408,52 @@ const GidoApp: React.FC<GidoAppProps> = ({
         </div>
       </div>
 
-      {/* Bottom: shop list + open-time image */}
+      {/* Bottom: map area */}
       <div
         style={{
-          height: `${LIST_HEIGHT_VH}vh`,
+          height: `${MAP_HEIGHT_VH}vh`,
+          width: "100vw",
           display: "flex",
-          flexDirection: "row",
+          justifyContent: "center",
+          alignItems: "center",
+          position: "relative",
+          marginTop: "auto",
         }}
       >
-        {/* Bottom: shop list */}
-        <div
+        <img
+          ref={floorMapRef}
+          src={floorMap}
+          alt={`Floor map ${floor}`}
+          draggable={false}
           style={{
-            flex: 2,
-            width: `${listWidthVh}vh`,
-            height: `${LIST_HEIGHT_VH}vh`,
+            maxWidth: "100%",
+            maxHeight: "100%",
+            objectFit: "contain",
           }}
-        >
-          {error ? (
-            <div style={{ padding: "16px 32px", color: "red" }}>
-              Error: {error}
-            </div>
-          ) : (
-            <ShopList
-              shops={shops}
-              floor={floor}
-              columnCount={currentLayout.columns}
-              rowsPerColumn={currentLayout.rowsPerCol}
-              perColumnRows={currentLayout.perColumnRows}
-              perColumnPadding={currentLayout.perColumnPadding}
-              genreMappings={genreMappings}
-              shopSettings={shopSettings}
-            />
-          )}
-        </div>
+          onLoad={() => {
+            logInfo("map", "Floor map image loaded", {
+              floor,
+              src: floorMap,
+            });
+          }}
+          onError={(event) => {
+            logAssetCheck("Failed to resolve asset path", {
+              type: "FLOOR_MAP",
+              floor,
+              attemptedPath: floorMap,
+              reason: "FILE_NOT_FOUND_OR_CORRUPT"
+            }, 'error');
 
-        {/* Bottom: Open-time image */}
-        <div
-          style={{
-            width: `${videoWidthVh}vh`,
-            height: `${LIST_HEIGHT_VH}vh`,
-            display: "flex",
-            justifyContent: "center",
-            alignItems: "center",
-            background: "#fff",
-            margin: "0 auto",
+            logError("map", "Failed to load floor map image", {
+              floor,
+              src: floorMap,
+            });
+            (event.target as HTMLImageElement).style.visibility = "hidden";
           }}
-        >
-          <img
-            ref={openTimeImageRef}
-            key={`opentime-${refreshKey}`}
-            src={imageSettings?.openTimeImage || openTimeImage}
-            alt="Open Time"
-            style={{
-              maxWidth: "100%",
-              maxHeight: "100%",
-              objectFit: "contain",
-              padding: "1.4em",
-            }}
-            onLoad={() => {
-              logInfo("openTime", "Open-time image loaded", {
-                src: imageSettings?.openTimeImage || openTimeImage,
-              });
-            }}
-            onError={(event) => {
-              logError("openTime", "Failed to load open-time image", {
-                src: imageSettings?.openTimeImage || openTimeImage,
-              });
-              (event.target as HTMLImageElement).style.visibility = "hidden";
-            }}
-          />
-        </div>
+        />
+
+        {/* Location icons overlay */}
+        <LocationIconsOverlay settings={locationIconSettings} />
       </div>
 
     </div>

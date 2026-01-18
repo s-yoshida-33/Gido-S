@@ -18,7 +18,7 @@ function configureLogger() {
   const logDir = path.join(userData, 'logs');
 
   log.transports.file.resolvePath = () =>
-    path.join(logDir, 'gido.log');
+    path.join(logDir, 'gido-s.log');
 
   log.transports.file.maxSize = 5 * 1024 * 1024; // 5 MB per file
   log.transports.console.level =
@@ -113,7 +113,7 @@ function notifySlack(level, message, context = {}) {
     `*Level*: ${level.toUpperCase()}`,
     `*Scope*: ${scope}`,
     `*Message*: ${message}`,
-    `*App*: Gido`,
+    `*App*: Gido-S`,
     `*Version*: ${appVersion}`,
     `*Host*: ${hostname}`,
   ];
@@ -213,22 +213,27 @@ function safeLogObject(obj, maxLen = 500, depth = 3) {
 function formatMessage(level, message, context = {}) {
   const appVersion = app.getVersion ? app.getVersion() : 'dev';
 
-  // Sanitize context to prevent huge logs (e.g. base64 images)
-  const safeContext = safeLogObject(context);
+  // Extract tag if present, default to 'GENERAL'
+  const { tag, ...restContext } = context;
+  const logTag = tag || 'GENERAL';
 
-  const base = {
-    level,
-    app: 'Gido',
-    version: appVersion,
-    host: hostname,
-    ...safeContext,
+  // Sanitize context to prevent huge logs (e.g. base64 images)
+  const safeDetails = safeLogObject(restContext);
+
+  const logEntry = {
+    timestamp: new Date().toISOString(),
+    level: level,
+    tag: logTag,
+    message: message,
+    details: {
+      app: 'Gido-S',
+      version: appVersion,
+      host: hostname,
+      ...safeDetails,
+    }
   };
 
-  return JSON.stringify({
-    ...base,
-    message,
-    ts: new Date().toISOString(),
-  });
+  return JSON.stringify(logEntry);
 }
 
 /**

@@ -1,6 +1,6 @@
-# Gido (ギド)
+# Gido-S (ギド-S)
 
-**Gido** は、店舗案内（フロアガイド）やデジタルサイネージを表示するためのキオスク・サイネージアプリケーションです。
+**Gido-S** は、店舗案内（フロアガイド）やデジタルサイネージを表示するためのキオスク・サイネージアプリケーションです。
 Electron + React + Vite + TypeScript で構築されており、店舗管理システム (BridgeGround) や CMS (WonderScreen) と連携して、常に最新の情報を表示します。
 
 ## 主な機能
@@ -111,7 +111,7 @@ npm run electron:build
 ## ディレクトリ構成
 
 ```
-Gido/
+Gido-S/
 ├── electron/           # Electronメインプロセス関連
 │   ├── main.cjs        # エントリーポイント、ウィンドウ管理、IPC通信
 │   ├── preload.cjs     # プリロードスクリプト (Context Bridge)
