@@ -100,8 +100,9 @@ export async function fetchShopsFromBridge(): Promise<Shop[]> {
       logWarn("shopList", "Bridge API returned non-200 response", {
         status: res.status,
         statusText: res.statusText,
+        url,
       });
-      throw new Error(`Bridge API error: HTTP ${res.status}`);
+      throw new Error(`Bridge API error: HTTP ${res.status} from ${url}`);
     }
 
     const json = await res.json();
@@ -122,10 +123,19 @@ export async function fetchShopsFromBridge(): Promise<Shop[]> {
 
     return shops;
   } catch (error: any) {
-    logError("shopList", "Failed to fetch shops from Bridge API", {
-      error: error?.message,
+    const errorDetails = {
+      message: error?.message,
+      name: error?.name,
       url,
-    });
+      baseUrl,
+    };
+
+    if (error?.message?.includes('Failed to fetch') || error?.name === 'TypeError') {
+       logError("shopList", "Network error communicating with Bridge API. Check if the server is running and port is correct.", errorDetails);
+    } else {
+       logError("shopList", "Failed to fetch shops from Bridge API", errorDetails);
+    }
+    
     throw error;
   }
 }
