@@ -7,7 +7,6 @@ import type { Shop } from "../types/shop";
 import floorMap1F from "../assets/floor-1F-map.svg";
 import floorMap2F from "../assets/floor-2F-map.svg";
 import floorMap3F from "../assets/floor-3F-map.svg";
-import floorMap4F from "../assets/floor-4F-map.svg";
 
 import { APP_CONFIG, POLLING_INTERVALS } from "../config";
 import { fetchShops } from "../repositories/shopRepository";
@@ -37,7 +36,6 @@ const FLOOR_MAPS: Record<string, string> = {
   "1F": floorMap1F,
   "2F": floorMap2F,
   "3F": floorMap3F,
-  "4F": floorMap4F,
 };
 
 type ColumnPadding = {
