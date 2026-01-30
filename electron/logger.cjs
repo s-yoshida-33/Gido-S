@@ -38,7 +38,16 @@ function configureLogger() {
  * Scopes that should generate alerts.
  * Only these scopes will be monitored for transitions.
  */
-const alertScopes = new Set(['map', 'shopList', 'video', 'openTime']);
+const alertScopes = new Set([
+  'map',
+  'shopList',
+  'video',
+  'openTime',
+  'SYSTEM',
+  'DATA_SYNC',
+  'CMS_DELIVERY',
+  'ASSET_CHECK'
+]);
 
 /**
  * Keeps the last known alert state for each scope or (scope + floor).
@@ -213,27 +222,22 @@ function safeLogObject(obj, maxLen = 500, depth = 3) {
 function formatMessage(level, message, context = {}) {
   const appVersion = app.getVersion ? app.getVersion() : 'dev';
 
-  // Extract tag if present, default to 'GENERAL'
-  const { tag, ...restContext } = context;
-  const logTag = tag || 'GENERAL';
-
   // Sanitize context to prevent huge logs (e.g. base64 images)
-  const safeDetails = safeLogObject(restContext);
+  const safeContext = safeLogObject(context);
 
-  const logEntry = {
-    timestamp: new Date().toISOString(),
-    level: level,
-    tag: logTag,
-    message: message,
-    details: {
-      app: 'Gido-S',
-      version: appVersion,
-      host: hostname,
-      ...safeDetails,
-    }
+  const base = {
+    level,
+    app: 'Gido-S',
+    version: appVersion,
+    host: hostname,
+    ...safeContext,
   };
 
-  return JSON.stringify(logEntry);
+  return JSON.stringify({
+    ...base,
+    message,
+    ts: new Date().toISOString(),
+  });
 }
 
 /**

@@ -1,7 +1,8 @@
 // src/components/VerticalVideoSlot.tsx
 import React from 'react';
 import { useCurrentAsset } from '../hooks/useCurrentAsset';
-import { logInfo, logWarn, logError } from '../logs/logging';
+import { logWarn, logError, logDebug } from '../logs/logging';
+import { OptimizedVideo } from './OptimizedVideo';
 
 interface VerticalVideoSlotProps {
   muted?: boolean;
@@ -73,7 +74,7 @@ const VerticalVideoSlot: React.FC<VerticalVideoSlotProps> = ({ muted = false }) 
           objectFit: 'cover',
         }}
         onLoad={() => {
-          logInfo('image', 'Image loaded in VerticalVideoSlot', {
+          logDebug('image', 'Image loaded in VerticalVideoSlot', {
             assetId: asset.id,
             src: asset.src,
           });
@@ -88,11 +89,13 @@ const VerticalVideoSlot: React.FC<VerticalVideoSlotProps> = ({ muted = false }) 
     );
   }
 
-  // Render as video (default)
+  // Render as video (use OptimizedVideo)
   return (
-    <video
+    <OptimizedVideo
       ref={videoRef}
+      // Gido-Sの既存ロジック（アセット変更時に再マウント）を維持して確実にクリーンアップを実行させる場合
       key={mediaKey}
+      
       src={asset.src}
       autoPlay
       loop={true}
@@ -105,18 +108,18 @@ const VerticalVideoSlot: React.FC<VerticalVideoSlotProps> = ({ muted = false }) 
         objectFit: 'cover',
       }}
       onLoadedData={() => {
-        logInfo('video', 'Video loaded in VerticalVideoSlot', {
+        logDebug('video', 'Video loaded in VerticalVideoSlot', {
           assetId: asset.id,
           src: asset.src,
         });
       }}
       onPlay={() => {
-        logInfo('video', 'Video playback started', {
+        logDebug('video', 'Video playback started', {
           assetId: asset.id,
         });
       }}
       onEnded={() => {
-        logInfo('video', 'Video playback ended (will loop)', {
+        logDebug('video', 'Video playback ended (will loop)', {
           assetId: asset.id,
         });
       }}
